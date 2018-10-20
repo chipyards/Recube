@@ -6,7 +6,7 @@
    - derive du parseur version C de JADE
    - derive du parseur version D de TREE (Lilas4)
    - supporte CDATA (mais recupere pas)
-   - recupere le texte 'inner' entre start-tag et end-tag
+   - recupere le texte 'inner' entre start-tag et end-tag (si non-blanc)
    - compte les lignes et les caracteres
    - step differentie plus clairement empty-element-tag et start-tag
    - old bug fix : manquait un else au case 2 :
@@ -36,9 +36,9 @@ else                 os << " />\n";
 os << ">\n";
 }
 
-// xmlobj method bodies
+// xmlobj methodes proc1char() et step()
 /* le parseur : lit le texte jusqu'a pouvoir retourner :
-   0 reserve
+   0 r.a.s.
    1 nouvel element : fin de start-tag (tous attributs inclus, contenu exclu)
      accessible au sommet de la pile (this->stac)
    2 fin de end-tag de l'element courant
@@ -89,26 +89,21 @@ BUGs : (pas graves)
 	- ne devrait pas tolerer blanc entre < et nom tag
 	- devrait tolerer blanc entre nom attr et =
  */
-int xmlobj::step()
+
+// cette fonction parse un caractere et rend zero sauf si on a une fin de tag (ou une erreur)
+int xmlobj::proc1char( int c )
 {
-
-int c;		// caractere courant, int pour percevoir EOF
-string nam;	// nom tag ou attribut courant dans ce step
-string val;	// valeur attribut courant dans ce step
-
-if ( e == -1 )	// depilage eventuel avant lecture char
-   {
-   if   ( stac.size() )
-	stac.pop_back();
-   else return(-667);
-   e = 0;
-   }
-
-while ( ( c = is.get() ) != EOF )
-   {
-   ++curchar;
-   if ( c == 10 ) curlin++;
-   switch (e)
+++curchar;
+if	( c == 10 )
+	curlin++;
+if	( e == -1 )	// depilage eventuel avant lecture char
+	{
+	if	( stac.size() )
+		stac.pop_back();
+	else	return(-667);
+	e = 0;
+	}
+switch	( e )
 	{
 	case 0:	if	( c == '<' )
 			{
@@ -119,6 +114,7 @@ while ( ( c = is.get() ) != EOF )
 			if	( stac.size() )
 				{
 				val = char(c);
+				inner_flag = ( c > ' ' );
 				e = 70;
 				}
 			}			break;
@@ -277,15 +273,32 @@ while ( ( c = is.get() ) != EOF )
 	case 70: if	( c == '<' )
 			{
 			e = 1;
-			stac.back().inner = val;
+			if	( inner_flag )
+				stac.back().inner = val;
 			}
 		else	{
 			val += char(c);
+			if	( c > ' ' )
+				inner_flag |= 1; 
 			}			break;
 	default: return(-666);
 	}
-   // printf("c='%c'  e=%d\n", c, e );
-   }
+// printf("c='%c'  e=%d\n", c, e );
+return 0;
+}
+
+// cette fonction parse le stream en s'arretant à chaque fin de tag
+int xmlobj::step()
+{
+int c;	// caractere courant, int pour percevoir EOF
+int retval;
+
+while	( ( c = is.get() ) != EOF )
+	{
+	retval = proc1char( c );
+	if	( retval )
+		return retval;
+	}
 // si on est ici on a atteint la fin du fichier
 return(9);
 }
