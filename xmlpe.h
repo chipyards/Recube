@@ -1,10 +1,4 @@
 /* parseur XML version E
-   - derive du parseur en C de VirVol 1 a 14
-   - ignore le texte dans le contenu des elements
-   - maintient une pile de l'ascendance de l'element courant
-   - teste l'existence des noms d'attributs dans un objet DTD s'il existe
-     ( mais ne lit pas la DTD du XML, l'objet DTD doit etre cree et renseigne
-       par l'application )
  */
 
 #include <iostream>
@@ -41,7 +35,7 @@ public:
 
 // data
 string tag;	// the tag name
-// string text;	// the text between the tags
+string inner;	// the text between the tags
 map < string, string > attr;	// the attributes, by names
 
 // constructeurs
