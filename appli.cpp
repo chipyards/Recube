@@ -51,7 +51,7 @@ if	( !(lexml->is) )
 	return 1;
 int status;
 // valeurs temporaires
-xelem * elem; string id;
+xelem * elem;
 int level = 0;
 
 lexml->curchar = 0;
@@ -62,21 +62,28 @@ while	( ( status = lexml->step() ) != 9 )
 	switch	( status )
 		{
 		case 1 :	// start-tag
-			id = elem->attr[string("id")];		// copier son id
 			printf("%5d ", lexml->curchar );
 			indent( (level++) * 3 );
-			printf("%s id=%s...\n", elem->tag.c_str(), id.c_str() );
+			printf("%s", elem->tag.c_str() );
+			if	( elem->attr.count(string("id")) )
+				printf(" id=%s", elem->attr[string("id")].c_str() );
+			printf("...\n");
 		break;
 		case 2 :	// end-tag
 			printf("%5d ", lexml->curchar );
 			indent( (--level) * 3 );
-			printf("%s <>%s<>\n", elem->tag.c_str(), elem->inner.c_str() );
+			printf("%s", elem->tag.c_str() );
+			if	( elem->inner.size() )
+				printf(" '%s'", elem->inner.c_str() );
+			printf("\n");
 		break;
 		case 3 :
-			id = elem->attr[string("id")];		// copier son id
 			printf("%5d ", lexml->curchar );
 			indent( level * 3 );
-			printf("%s : %s\n", elem->tag.c_str(), id.c_str() );
+			printf("%s", elem->tag.c_str() );
+			if	( elem->attr.count(string("id")) )
+				printf(" id=%s", elem->attr[string("id")].c_str() );
+			printf("\n");
 		break;
 		default :
 		gasp("%s ligne %d : syntaxe xml %d", lexml->filepath, (lexml->curlin+1), status );

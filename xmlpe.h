@@ -57,20 +57,21 @@ const char * filepath;
 ifstream is;
 int curchar;
 int curlin;
+string nam;	// nom de tag ou d'attribut courant
+string val;	// valeur d'attribut courant
+
 int e;			// etat du parseur
+int inner_flag;		// indique la presence d'un contenu non blanc pour inner
 vector < xelem > stac;	// stack of parent elements
 DTD * pDTD;		// null, ou pointeur sur une DTD
 // constructors
 xmlobj() : curchar(0), curlin(0), e(0), pDTD(NULL)  {};
 explicit xmlobj( const char* fnam, DTD * votreDTD = NULL ) : is(fnam) {
-  filepath = fnam; pDTD = votreDTD; curlin = 0; e = 0;
+  filepath = fnam; pDTD = votreDTD; curchar = 0; curlin = 0; e = 0;
   }
-
-// parser
-/* step returns  :	0 for EOF
-			1 for "start element"
-			2 for "end element"
- */
+// cette fonction parse un caractere et rend zero sauf si on a une fin de tag (ou une erreur)
+int proc1char( int c );
+// cette fonction parse le stream en s'arretant à chaque fin de tag
 int step();
 
 }; 	// class xmlobj
