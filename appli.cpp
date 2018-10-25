@@ -44,65 +44,83 @@ for	( i = 0; i < n; ++i )
 	putchar(' ');
 }
 
-int load_xml( char * xmlpath )
+int scan_xml( char * tbuf, int qbuf )
 {
-xmlobj * lexml = new xmlobj( xmlpath, NULL );
-if	( !(lexml->is) )
-	return 1;
-int status;
-// valeurs temporaires
+int status, srcpos;
 xelem * elem;
 int level = 0;
+xmlobj * lexml = new xmlobj();	// ici on ne demande pas l'ouverture d'un istream, le fichier est deja lu
 
-lexml->curchar = 0;
-// la boucle des steps
-while	( ( status = lexml->step() ) != 9 )
+
+// la boucle des chars
+for	( srcpos = 0; srcpos < qbuf; ++srcpos )
 	{
-	elem = &lexml->stac.back();
-	switch	( status )
+	status = lexml->proc1char( tbuf[srcpos] );
+	if	( status )			// status 0 : rien a faire; status 1, 2, ou 3 : ok; status < 0 : erreur 
 		{
-		case 1 :	// start-tag
-			printf("%5d ", lexml->curchar );
-			indent( (level++) * 3 );
-			printf("%s", elem->tag.c_str() );
-			if	( elem->attr.count(string("id")) )
-				printf(" id=%s", elem->attr[string("id")].c_str() );
-			printf("...\n");
-		break;
-		case 2 :	// end-tag
-			printf("%5d ", lexml->curchar );
-			indent( (--level) * 3 );
-			printf("%s", elem->tag.c_str() );
-			if	( elem->inner.size() )
-				printf(" '%s'", elem->inner.c_str() );
-			printf("\n");
-		break;
-		case 3 :
-			printf("%5d ", lexml->curchar );
-			indent( level * 3 );
-			printf("%s", elem->tag.c_str() );
-			if	( elem->attr.count(string("id")) )
-				printf(" id=%s", elem->attr[string("id")].c_str() );
-			printf("\n");
-		break;
-		default :
-		gasp("%s ligne %d : syntaxe xml %d", lexml->filepath, (lexml->curlin+1), status );
-		}
-	}	// while status
+		elem = &lexml->stac.back();
+		switch	( status )
+			{
+			case 1 :	// start-tag
+				printf("%5d ", srcpos );
+				indent( (level++) * 3 );
+				printf("%s", elem->tag.c_str() );
+				if	( elem->attr.count(string("id")) )
+					printf(" id=%s", elem->attr[string("id")].c_str() );
+				printf("...\n");
+			break;
+			case 2 :	// end-tag
+				printf("%5d ", srcpos );
+				indent( (--level) * 3 );
+				printf("%s", elem->tag.c_str() );
+				if	( elem->inner.size() )
+					printf(" '%s'", elem->inner.c_str() );
+				printf("\n");
+			break;
+			case 3 :
+				printf("%5d ", srcpos );
+				indent( level * 3 );
+				printf("%s", elem->tag.c_str() );
+				if	( elem->attr.count(string("id")) )
+					printf(" id=%s", elem->attr[string("id")].c_str() );
+				printf("\n");
+			break;
+			default :
+			gasp("%s ligne %d : syntaxe xml %d", lexml->filepath, (lexml->curlin+1), status );
+			}
+		}	// if status
+	}	// for
 return 0;
 }
+
+#define QXML	(1<<16)
 
 /* ============================== the main ===================================== */
 int main( int argc, char ** argv )
 {
 int retval;
+FILE * srcfil;
+FILE * dstfil = stdout;
+char xmlbuf[QXML];
+int qxml = 0;
 
 if	( argc < 2 )
 	usage();
 
-retval = load_xml( argv[1] );
-if	( retval )
-	gasp("problem avec %s, code %d\n", argv[1], retval );
+srcfil = fopen( argv[1], "r" );
+if	( srcfil == NULL )
+	gasp("echec ouverture %s", argv[1] );
+
+qxml = fread( xmlbuf, 1, QXML, srcfil );
+
+if	( qxml <= 0 )
+	gasp("rien lu dans %s", argv[1] );
+if	( qxml == QXML )
+	gasp("%s trop gros (%d bytes)", argv[1], qxml );
+
+printf("lu %d bytes\n", qxml ); 
+
+retval = scan_xml( xmlbuf, qxml );
 	
 return 0;
 }
