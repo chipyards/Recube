@@ -37,10 +37,13 @@ public:
 string tag;	// the tag name
 string inner;	// the text between the tags
 map < string, string > attr;	// the attributes, by names
-
+int start_pos0;		// position suivant le premier '<'
+int start_pos1;		// position du premier '>' (ou -1 si empty element)
+int end_pos0;		// position suivant le 2nd '<' (ou -1 si empty element)
+int end_pos1;		// position du dernier '>'
 // constructeurs
-xelem() {};
-explicit xelem( const string & thetag ) {
+xelem() : start_pos0(-1), start_pos1(-1), end_pos0(-1), end_pos1(-1) {};
+explicit xelem( const string & thetag ) : start_pos0(-1), start_pos1(-1), end_pos0(-1), end_pos1(-1) {
   tag = thetag;
   }
 
@@ -55,8 +58,9 @@ public:
 // data
 const char * filepath;
 ifstream is;
-int curchar;
-int curlin;
+int curchar;	// position du prochain char
+int curlin;	// numero de la prochaine ligne
+int lt_pos;	// position du dernier '<'
 string nam;	// nom de tag ou d'attribut courant
 string val;	// valeur d'attribut courant
 

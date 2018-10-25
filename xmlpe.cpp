@@ -108,6 +108,7 @@ switch	( e )
 	case 0:	if	( c == '<' )
 			{
 			e = 1;
+			lt_pos = curchar;
 			nam = "";
 			}
 		else	{
@@ -142,6 +143,8 @@ switch	( e )
 			if	( c == '>' )			// fin de start-tag
 				{
 				e = 0;
+				stac.back().start_pos0 = lt_pos;
+				stac.back().start_pos1 = curchar - 1;
 				return(1);
 				}
 			else if	( c == '/' )
@@ -152,6 +155,8 @@ switch	( e )
 	case 3:	if	( c == '>' )
 			{
 			e = 0;				// fin de start-tag
+			stac.back().start_pos0 = lt_pos;
+			stac.back().start_pos1 = curchar - 1;
 			return(1);
 			}
 		else if	( c == '/' )
@@ -195,12 +200,16 @@ switch	( e )
 	case 7:	if	( c == '>' )
 			{
 			e = -1;				// fin d'empty element tag
+			stac.back().start_pos0 = lt_pos;
+			stac.back().end_pos1 = curchar - 1;
 			return(3);
 			}
 		else	return(-700);		break;
 	case 10: if	( c == '>' )
 			{
 			e = -1;				// fin de end-tag
+			stac.back().end_pos0 = lt_pos;
+			stac.back().end_pos1 = curchar - 1;
 			if	( nam != stac.back().tag )
 				return(-1001);
 			return(2);
@@ -213,6 +222,8 @@ switch	( e )
 	case 11: if	( c == '>' )
 			{
 			e = -1;				// fin de end-tag
+			stac.back().end_pos0 = lt_pos;
+			stac.back().end_pos1 = curchar - 1;
 			if	( nam != stac.back().tag )
 				return(-1001);
 			return(2);
@@ -273,6 +284,7 @@ switch	( e )
 	case 70: if	( c == '<' )
 			{
 			e = 1;
+			lt_pos = curchar;
 			if	( inner_flag )
 				stac.back().inner = val;
 			}

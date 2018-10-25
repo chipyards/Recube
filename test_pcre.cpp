@@ -65,7 +65,7 @@ lareu->start = 0;
 while	( ( mcnt = lareu->matchav() > 0 ) )
 	{
 	printf("m=%d (%d:%d)\n", mcnt, lareu->ovector[0], lareu->ovector[1] );
-	for	( int i = lareu->ovector[0]; i < lareu->ovector[1]; ++i )
+	for	( int i = lareu->ovector[2]; i < lareu->ovector[3]; ++i )
 		{
 		putchar( xmlbuf[i] );
 		}
