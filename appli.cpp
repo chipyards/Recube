@@ -13,6 +13,7 @@ using namespace std;
 #include <map>
 
 #include "xmlpe.h"
+#include "projfile.h"
 
 extern "C" {
 /* gasp classique --> stderr par defaut */
@@ -37,63 +38,7 @@ printf("usage : appli input_file\n");
 exit(1);
 }
 
-void indent( int n )
-{
-int i;
-for	( i = 0; i < n; ++i )
-	putchar(' ');
-}
-
-// un scan generique qui affiche l'inner des elements et l'attribut 'id'
-int scan_xml( char * tbuf, int qbuf )
-{
-int status, srcpos;
-xelem * elem;
-int level = 0;
-xmlobj * lexml = new xmlobj();	// ici on ne demande pas l'ouverture d'un istream, le fichier est deja lu
-
-
-// la boucle des chars
-for	( srcpos = 0; srcpos < qbuf; ++srcpos )
-	{
-	status = lexml->proc1char( tbuf[srcpos] );
-	if	( status )			// status 0 : rien a faire; status 1, 2, ou 3 : ok; status < 0 : erreur 
-		{
-		elem = &lexml->stac.back();
-		switch	( status )
-			{
-			case 1 :	// start-tag
-				printf("%5d ", srcpos );
-				indent( (level++) * 3 );
-				printf("%s", elem->tag.c_str() );
-				if	( elem->attr.count(string("id")) )
-					printf(" id=%s", elem->attr[string("id")].c_str() );
-				printf("...\n");
-			break;
-			case 2 :	// end-tag
-				printf("%5d ", srcpos );
-				indent( (--level) * 3 );
-				printf("%s", elem->tag.c_str() );
-				if	( elem->inner.size() )
-					printf(" '%s'", elem->inner.c_str() );
-				printf("\n");
-			break;
-			case 3 :
-				printf("%5d ", srcpos );
-				indent( level * 3 );
-				printf("%s", elem->tag.c_str() );
-				if	( elem->attr.count(string("id")) )
-					printf(" id=%s", elem->attr[string("id")].c_str() );
-				printf("\n");
-			break;
-			default :
-			gasp("%s ligne %d : syntaxe xml %d", lexml->filepath, (lexml->curlin+1), status );
-			}
-		}	// if status
-	}	// for
-return 0;
-}
-
+/*
 // un scan qui cherche les include paths dans un .cproject
 int scan_ac6_cproject( char * tbuf, int qbuf )
 {
@@ -312,8 +257,7 @@ for	( srcpos = 0; srcpos < qbuf; ++srcpos )
 return total;
 }
 
-
-#define QXML	(1<<16)
+*/
 
 /* ============================== the main ===================================== */
 int main( int argc, char ** argv )
@@ -321,8 +265,7 @@ int main( int argc, char ** argv )
 int retval;
 FILE * srcfil;
 FILE * dstfil = stdout;
-char xmlbuf[QXML];
-int qxml = 0;
+projfile * leproj;
 
 if	( argc < 2 )
 	usage();
@@ -331,15 +274,14 @@ srcfil = fopen( argv[1], "r" );
 if	( srcfil == NULL )
 	gasp("echec ouverture %s", argv[1] );
 
-qxml = fread( xmlbuf, 1, QXML, srcfil );
+leproj = new projfile();
 
-if	( qxml <= 0 )
-	gasp("rien lu dans %s", argv[1] );
-if	( qxml == QXML )
-	gasp("%s trop gros (%d bytes)", argv[1], qxml );
+retval = leproj->scan_xml( srcfil, stdout );
 
-printf("lu %d bytes\n", qxml ); 
+if	( retval )
+	gasp("oups %d ligne %d", retval, leproj->lexml->curlin+1 );
 
+/*
 string fnam = string( argv[1] ); 
 if	( fnam == string(".cproject") )
 	{
@@ -351,6 +293,6 @@ else if	( fnam == string(".project") )
 	retval = scan_ac6_project( xmlbuf, qxml );
 	printf("vu %d links relatif de plus de 4 niveaux\n", retval );
 	}
-
+*/
 return 0;
 }

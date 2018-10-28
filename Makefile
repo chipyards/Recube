@@ -3,11 +3,11 @@
 
 # listes
 SOURCESC=
-SOURCESCPP= xmlpe.cpp appli.cpp
+SOURCESCPP= xmlpe.cpp projfile.cpp appli.cpp
 EXE= recube.exe
 OBJS= $(SOURCESC:.c=.o) $(SOURCESCPP:.cpp=.o)
      
-HEADERS= pcreux.h xmlpe.h
+HEADERS= pcreux.h xmlpe.h projfile.h
 
 # INCS= -IC:\Appli\GnuWin32\include
 INCS=
@@ -36,3 +36,4 @@ delo :
 
 appli.o : ${HEADERS}
 xmlpe.o : ${HEADERS}
+projfile.o : ${HEADERS}
