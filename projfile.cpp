@@ -8,14 +8,17 @@ using namespace std;
 #include <map>
 #include <vector>
 
-#include "pcreux.h"
-#include "xmlpe.h"
-#include "projfile.h"
-
 extern "C" {
 void gasp( const char *fmt, ... );  /* fatal error handling */
 }
 
+#include "pcreux.h"
+#include "xmlpe.h"
+#include "charvec.h"
+#include "projfile.h"
+
+
+/*
 void projfile::push_src( int c )	// allocation memoire incluse
 {
 if	( qsrc >= capsrc )
@@ -34,7 +37,7 @@ if	( qsrc >= capsrc )
 	}
 src_buf[qsrc++] = c;
 }
-
+*/
 
 // un scan generique qui affiche l'inner des elements et l'attribut 'id'
 int projfile::scan_xml( FILE * sfil, FILE * logfil )
@@ -83,7 +86,8 @@ return 0;
 }
 
 // un scan qui cherche les include paths dans un .cproject
-int projfile::scan_ac6_cproject( FILE * sfil, FILE * logfil )
+// remplace eventuellement les chemins relatifs sur les Drivers
+int projfile::scan_ac6_cproject( FILE * sfil, FILE * logfil, const char * patch )
 {
 int status, c;
 int include_path_flag = 0;
@@ -97,7 +101,7 @@ fprintf( logfil, "chemins des drivers :\n");
 // la boucle des chars
 while	( ( c = fgetc( sfil ) ) != EOF )
 	{
-	push_src( c );
+	src_buf.push( c );
 	status = lexml->proc1char( c );
 	if	( status )			// status 0 : rien a faire; status 1, 2, ou 3 : ok; status < 0 : erreur 
 		{
@@ -140,7 +144,7 @@ while	( ( c = fgetc( sfil ) ) != EOF )
 					// fprintf( logfil, "pos0=%d len=%d\n", pos0, len );
 					if	( len > 0 )
 						{
-						lareu2->letexte = src_buf;		// LA SOLUTION qu'on cherchait !
+						lareu2->letexte = src_buf.data;		// LA SOLUTION qu'on cherchait !
 						lareu2->lalen = pos1;			// pcre ne compte pas len a partir de start
 						lareu2->start = pos0;			// mais a partir de 0
 						retval = lareu2->matchav();
@@ -151,8 +155,17 @@ while	( ( c = fgetc( sfil ) ) != EOF )
 							len = pos1 - pos0;
 							if	( len > 0 )
 								{
-								fprintf( logfil, "  \"%.*s\"\n", len, src_buf + pos0 );
+								fprintf( logfil, "  \"%.*s\"\n", len, src_buf.data + pos0 );
 								++hits;
+								if	( patch )
+									{
+									int ic = 0;
+									while	( src_ic < pos0 )
+										dst_buf.push( src_buf.data[src_ic++] );
+									while	( ( c = patch[ic++] ) )
+										dst_buf.push( c );
+									src_ic = pos1;
+									}
 								}
 							}
 						// else	fprintf( logfil, "?%d?|%.*s|\n", retval, len, tbuf + pos0 );
@@ -163,23 +176,29 @@ while	( ( c = fgetc( sfil ) ) != EOF )
 			}
 		}	// if status
 	}	// for
+if	( src_ic > 0 )
+	{
+	while	( src_ic < src_buf.size )
+		dst_buf.push( src_buf.data[src_ic++] );
+	}
 return 0;
 }
 
 // un scan qui cherche le nom et les gros links relatifs ou absolus dans un .project
-int projfile::scan_ac6_project( FILE * sfil, FILE * logfil )
+// remplace eventuellement les links relatifs sur les Drivers, et le nom
+int projfile::scan_ac6_project( FILE * sfil, FILE * logfil, const char * patch, const char * patch2 )
 {
 int status, c;
 int name_flag = 0, location_flag = 0;
 string * s; int pos0, pos1, len, retval;
 
-lareu1 = new pcreux( "PARENT-[5-9]-PROJECT_LOC" );	// "gros" link relatif
+lareu1 = new pcreux( "(PARENT-[5-9]-PROJECT_LOC.)Drivers" );	// "gros" link relatif
 lareu2 = new pcreux( "[A-Z]:.*[/\\\\]" );	// le compilateur C va deja enlever deux '\', pcre va enlever encore 1
 
 // la boucle des chars
 while	( ( c = fgetc( sfil ) ) != EOF )
 	{
-	push_src( c );
+	src_buf.push( c );
 	status = lexml->proc1char( c );
 	if	( status )			// status 0 : rien a faire; status 1, 2, ou 3 : ok; status < 0 : erreur 
 		{
@@ -221,7 +240,18 @@ while	( ( c = fgetc( sfil ) ) != EOF )
 					pos1 = elem->end_pos0 - 1;	// enlever le '<'
 					len = pos1 - pos0;
 					if	( len > 0 )
-						fprintf( logfil, "name = \"%.*s\"\n", len, src_buf + pos0 );
+						{
+						fprintf( logfil, "name = \"%.*s\"\n", len, src_buf.data + pos0 );
+						if	( patch2 )
+							{
+							int ic = 0;
+							while	( src_ic < pos0 )
+								dst_buf.push( src_buf.data[src_ic++] );
+							while	( ( c = patch2[ic++] ) )
+								dst_buf.push( c );
+							src_ic = pos1;
+							}
+						}
 					name_flag = 0;
 					}
 				else if	(
@@ -236,25 +266,34 @@ while	( ( c = fgetc( sfil ) ) != EOF )
 					len = pos1 - pos0;
 					if	( len > 0 )
 						{
-						// fprintf( logfil, "location = \"%.*s\"\n", len, src_buf + pos0 );
-						lareu1->letexte = src_buf;
+						// fprintf( logfil, "location = \"%.*s\"\n", len, src_buf.data + pos0 );
+						lareu1->letexte = src_buf.data;
 						lareu1->lalen = pos1;
 						lareu1->start = pos0;
 						retval = lareu1->matchav();
 						if	( retval > 0 )
 							{
-							pos0 = lareu1->ovector[0];
-							pos1 = lareu1->ovector[1];
+							pos0 = lareu1->ovector[2];
+							pos1 = lareu1->ovector[3];
 							len = pos1 - pos0;
 							if	( len > 0 )
 								{
-								fprintf( logfil, "gros link relatif : \"%.*s\"\n", len, src_buf + pos0 );
+								fprintf( logfil, "driver link relatif : \"%.*s\"\n", len, src_buf.data + pos0 );
 								++hits;
+								if	( patch )
+									{
+									int ic = 0;
+									while	( src_ic < pos0 )
+										dst_buf.push( src_buf.data[src_ic++] );
+									while	( ( c = patch[ic++] ) )
+										dst_buf.push( c );
+									src_ic = pos1;
+									}
 								}
 							}
 						else	{
-							//fprintf( logfil, "?%d?|%.*s|\n", retval, len, src_buf + pos0 );
-							lareu2->letexte = src_buf;
+							//fprintf( logfil, "?%d?|%.*s|\n", retval, len, src_buf.data + pos0 );
+							lareu2->letexte = src_buf.data;
 							lareu2->lalen = pos1;
 							lareu2->start = pos0;
 							retval = lareu2->matchav();
@@ -265,11 +304,10 @@ while	( ( c = fgetc( sfil ) ) != EOF )
 								len = pos1 - pos0;
 								if	( len > 0 )
 									{
-									fprintf( logfil, "link absolu : \"%.*s\"\n", len, src_buf + pos0 );
-									++hits;
+									fprintf( logfil, "link absolu : \"%.*s\"\n", len, src_buf.data + pos0 );
 									}
 								}
-							// else	fprintf( logfil, "?%d?|%.*s|\n", retval, len, src_buf + pos0 );
+							// else	fprintf( logfil, "?%d?|%.*s|\n", retval, len, src_buf.data + pos0 );
 							}
 						}
 					location_flag = 0;
@@ -282,6 +320,11 @@ while	( ( c = fgetc( sfil ) ) != EOF )
 			}
 		}	// if status
 	}	// for
+if	( src_ic > 0 )
+	{
+	while	( src_ic < src_buf.size )
+		dst_buf.push( src_buf.data[src_ic++] );
+	}
 return 0;
 }
 
