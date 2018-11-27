@@ -18,26 +18,58 @@ void gasp( const char *fmt, ... );  /* fatal error handling */
 #include "projfile.h"
 
 
-/*
-void projfile::push_src( int c )	// allocation memoire incluse
+int projfile::process_file( const char * fnam, const char * new_inc_path, const char * new_proj_name )
 {
-if	( qsrc >= capsrc )
+FILE * srcfil, *dstfil;
+int retval = 0;
+srcfil = fopen( fnam, "r" );
+if	( srcfil == NULL )
+	return 1;		// fichier non trouve, retour silencieux
+
+printf("===== fichier %s ====\n", fnam );
+
+if	( string(fnam) == string(".cproject") )
 	{
-	if	( capsrc == 0 )
-		{
-		capsrc = INIT_ALLOC;
-		src_buf = (char *)malloc( capsrc );
-		}
-	else	{
-		capsrc *= 2;
-		src_buf = (char *)realloc( (void *)src_buf, capsrc );
-		}
-	if	( src_buf == NULL )
-		gasp("echec alloc memoire %d", capsrc );
+	retval = scan_ac6_cproject( srcfil, stdout, new_inc_path );
+	if	( hits )
+		printf("vu %d chemins de drivers\n", hits );
 	}
-src_buf[qsrc++] = c;
+else if	( string(fnam) == string(".project") )
+	{
+	retval = scan_ac6_project( srcfil, stdout, new_inc_path, new_proj_name );
+	if	( hits )
+		printf("vu %d links de drivers relatif, de plus de 4 niveaux\n", hits );
+	}
+if	( retval )
+	gasp("erreur xml %d ligne %d", retval, lexml->curlin+1 );
+fclose( srcfil );
+
+if	( ( hits == 0 ) && ( hits2 == 0 ) )
+	return 2;		// aucun hit, retour silencieux
+if	( dst_buf.size == 0 )
+	return 3;		// aucune substitution, retour silencieux
+
+if	( ( new_inc_path ) && ( hits ) )
+	printf("a remplacer par %s\n", new_inc_path );
+if	( ( new_proj_name ) && ( hits2 ) )
+	printf("nouveau nom de projet %s\n", new_proj_name );
+
+printf("sauver la version modifiee? (Y/N)\n");
+fflush( stdout );
+if	( ( getchar() == 'y' ) || ( getchar() == 'Y' ) )
+	{
+	dstfil = fopen( fnam, "w" );
+	if	( dstfil == NULL )
+		gasp("echec ouverture %s", fnam );
+	if	( fwrite( dst_buf.data, 1, dst_buf.size, dstfil ) != (size_t)dst_buf.size	)
+		gasp("echec ecriture %s", fnam );
+	fclose( dstfil );
+	printf("c'est fait\n");
+	}
+else	printf("ok, bye\n");
+return 0;
 }
-*/
+
 
 // un scan generique qui affiche l'inner des elements et l'attribut 'id'
 int projfile::scan_xml( FILE * sfil, FILE * logfil )
@@ -49,7 +81,7 @@ int level = 0;
 while	( ( c = fgetc( sfil ) ) != EOF )
 	{
 	status = lexml->proc1char( c );
-	if	( status )			// status 0 : rien a faire; status 1, 2, ou 3 : ok; status < 0 : erreur 
+	if	( status )			// status 0 : rien a faire; status 1, 2, ou 3 : ok; status < 0 : erreur
 		{
 		elem = &lexml->stac.back();
 		switch	( status )
@@ -103,7 +135,7 @@ while	( ( c = fgetc( sfil ) ) != EOF )
 	{
 	src_buf.push( c );
 	status = lexml->proc1char( c );
-	if	( status )			// status 0 : rien a faire; status 1, 2, ou 3 : ok; status < 0 : erreur 
+	if	( status )			// status 0 : rien a faire; status 1, 2, ou 3 : ok; status < 0 : erreur
 		{
 		elem = &lexml->stac.back();
 		switch	( status )
@@ -172,6 +204,7 @@ while	( ( c = fgetc( sfil ) ) != EOF )
 						}
 					}
 			break;
+			default :
 				return status;
 			}
 		}	// if status
@@ -200,7 +233,7 @@ while	( ( c = fgetc( sfil ) ) != EOF )
 	{
 	src_buf.push( c );
 	status = lexml->proc1char( c );
-	if	( status )			// status 0 : rien a faire; status 1, 2, ou 3 : ok; status < 0 : erreur 
+	if	( status )			// status 0 : rien a faire; status 1, 2, ou 3 : ok; status < 0 : erreur
 		{
 		elem = &lexml->stac.back();
 		switch	( status )
@@ -242,6 +275,7 @@ while	( ( c = fgetc( sfil ) ) != EOF )
 					if	( len > 0 )
 						{
 						fprintf( logfil, "name = \"%.*s\"\n", len, src_buf.data + pos0 );
+						++hits2;
 						if	( patch2 )
 							{
 							int ic = 0;
