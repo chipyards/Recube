@@ -29,6 +29,7 @@ for	( int i = 0; i < len; ++i )
 return 0;
 }
 
+// traitement R/W d'un fichier projet, type selon fnam
 int projfile::process_file( const char * fnam, const char * new_inc_path, const char * new_proj_name )
 {
 FILE * srcfil, *dstfil;
@@ -42,17 +43,26 @@ printf("\n===== fichier %s ====\n", fnam );
 if	( string(fnam) == string(".cproject") )
 	{
 	retval = scan_ac6_cproject( srcfil, stdout, new_inc_path );
-	if	( hits )
-		printf("vu %d chemins de drivers\n", hits );
 	}
 else if	( string(fnam) == string(".project") )
 	{
 	retval = scan_ac6_project( srcfil, stdout, new_inc_path, new_proj_name );
-	if	( hits )
-		printf("vu %d chemins de drivers\n", hits );
 	}
+else if	( string(fnam) == string("Project.uvprojx") )
+	{
+	retval = scan_keil_uvprojx( srcfil, stdout, new_inc_path );
+	}
+else if	( string(fnam) == string("Project.uvoptx") )
+	{
+	retval = scan_keil_uvoptx( srcfil, stdout, new_inc_path );
+	}
+
 if	( retval )
 	gasp("erreur xml %d ligne %d", retval, lexml->curlin+1 );
+
+if	( hits )
+	printf("vu %d chemins de drivers\n", hits );
+
 fclose( srcfil );
 
 if	( ( hits == 0 ) && ( hits2 == 0 ) )
@@ -81,6 +91,253 @@ else	printf("ok, bye\n");
 return 0;
 }
 
+// un scan qui cherche les include paths et les drivers dans un .uvprojx
+// remplace eventuellement les chemins sur les Drivers
+int projfile::scan_keil_uvprojx( FILE * sfil, FILE * logfil, const char * patch )
+{
+int status, c;
+int include_path_flag = 0, file_path_flag = 0;
+int pos0, pos1, len, retval;
+
+lareu1 = new pcreux( "([.][.][^;]*[/\\\\]|[A-Za-z]:[^;]*[/\\\\])Drivers" );	// link de Driver
+lareu2 = new pcreux( "[A-Za-z]:.*[/\\\\]" );				// link absolu (pour info)
+				// ^^^^ le compilateur C va deja enlever deux '\', pcre va enlever encore 1
+
+fprintf( logfil, "chemins des drivers :\n");
+
+// la boucle des chars
+while	( ( c = fgetc( sfil ) ) != EOF )
+	{
+	src_buf.push( c );
+	status = lexml->proc1char( c );
+	if	( status )			// status 0 : rien a faire; status 1, 2, ou 3 : ok; status < 0 : erreur
+		{
+		elem = &lexml->stac.back();
+		switch	( status )
+			{
+			case 1 :	// start-tag : on cherche un tag <IncludePath> ou <FilePath> non vide
+				if	( elem->tag == string("IncludePath") )
+					include_path_flag = 1;
+				if	( elem->tag == string("FilePath") )
+					file_path_flag = 1;
+			break;
+			case 2 :	// end-tag
+				if	(
+					( elem->tag == string("IncludePath") ) &&
+					( include_path_flag )
+					)
+					{
+					include_path_flag = 0;
+					// on delimite l'inner :
+					pos0 = elem->start_pos1 + 1;	// enlever le '>'
+					pos1 = elem->end_pos0 - 1;	// enlever le '<'
+					len = pos1 - pos0;
+					if	( len > 0 )
+						{
+						// fprintf( logfil, "file path = \"%.*s\"\n", len, src_buf.data + pos0 );
+						lareu1->letexte = src_buf.data;
+						lareu1->lalen = pos1;
+						lareu1->start = pos0;
+						do	{
+							retval = lareu1->matchav();
+							if	( retval > 0 )
+								{
+								pos0 = lareu1->ovector[2];
+								pos1 = lareu1->ovector[3];
+								len = pos1 - pos0;
+								if	( len > 0 )
+									{
+									fprintf( logfil, "driver path : \"%.*s\"\n", len, src_buf.data + pos0 );
+									++hits;
+									if	( ( patch ) && ( txtncmp( src_buf.data + pos0, patch, len ) ) )
+										{
+										int ic = 0;
+										while	( src_ic < pos0 )
+											dst_buf.push( src_buf.data[src_ic++] );
+										while	( ( c = patch[ic++] ) )
+											dst_buf.push( c );
+										src_ic = pos1;
+										}
+									}
+								// matchav a mis a jour lareu1->start pour le prochain tour
+								}
+							} while ( retval > 0 );
+						} // if len
+					} // if tag
+				if	(
+					( elem->tag == string("FilePath") ) &&
+					( file_path_flag )
+					)
+					{
+					file_path_flag = 0;
+					// on delimite l'inner :
+					pos0 = elem->start_pos1 + 1;	// enlever le '>'
+					pos1 = elem->end_pos0 - 1;	// enlever le '<'
+					len = pos1 - pos0;
+					if	( len > 0 )
+						{
+						// fprintf( logfil, "file path = \"%.*s\"\n", len, src_buf.data + pos0 );
+						lareu1->letexte = src_buf.data;
+						lareu1->lalen = pos1;
+						lareu1->start = pos0;
+						retval = lareu1->matchav();
+						if	( retval > 0 )
+							{
+							pos0 = lareu1->ovector[2];
+							pos1 = lareu1->ovector[3];
+							len = pos1 - pos0;
+							if	( len > 0 )
+								{
+								fprintf( logfil, "driver link : \"%.*s\"\n", len, src_buf.data + pos0 );
+								++hits;
+								if	( ( patch ) && ( txtncmp( src_buf.data + pos0, patch, len ) ) )
+									{
+									int ic = 0;
+									while	( src_ic < pos0 )
+										dst_buf.push( src_buf.data[src_ic++] );
+									while	( ( c = patch[ic++] ) )
+										dst_buf.push( c );
+									src_ic = pos1;
+									}
+								}
+							}
+						else	{
+							//fprintf( logfil, "?%d?|%.*s|\n", retval, len, src_buf.data + pos0 );
+							lareu2->letexte = src_buf.data;
+							lareu2->lalen = pos1;
+							lareu2->start = pos0;
+							retval = lareu2->matchav();
+							if	( retval > 0 )
+								{
+								pos0 = lareu2->ovector[0];
+								pos1 = lareu2->ovector[1];
+								len = pos1 - pos0;
+								if	( len > 0 )
+									{
+									fprintf( logfil, "link absolu : \"%.*s\" (pour info)\n", len, src_buf.data + pos0 );
+									}
+								}
+							// else	fprintf( logfil, "?%d?|%.*s|\n", retval, len, src_buf.data + pos0 );
+							}
+						} // if len
+					} // if tag
+			break;
+			case 3 :	// empty element tag : pas dans ce fichier
+			break;
+			default :
+				return status;
+			}
+		}	// if status
+	}	// for
+if	( src_ic > 0 )
+	{
+	while	( src_ic < src_buf.size )
+		dst_buf.push( src_buf.data[src_ic++] );
+	}
+return 0;
+}
+
+// un scan qui cherche les drivers dans un .uvoptx
+// remplace eventuellement les chemins sur les Drivers
+int projfile::scan_keil_uvoptx( FILE * sfil, FILE * logfil, const char * patch )
+{
+int status, c;
+int file_path_flag = 0;
+int pos0, pos1, len, retval;
+
+lareu1 = new pcreux( "([.][.][^;]*[/\\\\]|[A-Za-z]:[^;]*[/\\\\])Drivers" );	// link de Driver
+lareu2 = new pcreux( "[A-Za-z]:.*[/\\\\]" );				// link absolu (pour info)
+				// ^^^^ le compilateur C va deja enlever deux '\', pcre va enlever encore 1
+
+fprintf( logfil, "chemins des drivers :\n");
+
+// la boucle des chars
+while	( ( c = fgetc( sfil ) ) != EOF )
+	{
+	src_buf.push( c );
+	status = lexml->proc1char( c );
+	if	( status )			// status 0 : rien a faire; status 1, 2, ou 3 : ok; status < 0 : erreur
+		{
+		elem = &lexml->stac.back();
+		switch	( status )
+			{
+			case 1 :	// start-tag : on cherche un tag <PathWithFileName> non vide
+				if	( elem->tag == string("PathWithFileName") )
+					file_path_flag = 1;
+			break;
+			case 2 :	// end-tag
+				if	(
+					( elem->tag == string("PathWithFileName") ) &&
+					( file_path_flag )
+					)
+					{
+					file_path_flag = 0;
+					// on delimite l'inner :
+					pos0 = elem->start_pos1 + 1;	// enlever le '>'
+					pos1 = elem->end_pos0 - 1;	// enlever le '<'
+					len = pos1 - pos0;
+					if	( len > 0 )
+						{
+						// fprintf( logfil, "file path = \"%.*s\"\n", len, src_buf.data + pos0 );
+						lareu1->letexte = src_buf.data;
+						lareu1->lalen = pos1;
+						lareu1->start = pos0;
+						retval = lareu1->matchav();
+						if	( retval > 0 )
+							{
+							pos0 = lareu1->ovector[2];
+							pos1 = lareu1->ovector[3];
+							len = pos1 - pos0;
+							if	( len > 0 )
+								{
+								fprintf( logfil, "driver link : \"%.*s\"\n", len, src_buf.data + pos0 );
+								++hits;
+								if	( ( patch ) && ( txtncmp( src_buf.data + pos0, patch, len ) ) )
+									{
+									int ic = 0;
+									while	( src_ic < pos0 )
+										dst_buf.push( src_buf.data[src_ic++] );
+									while	( ( c = patch[ic++] ) )
+										dst_buf.push( c );
+									src_ic = pos1;
+									}
+								}
+							}
+						else	{
+							//fprintf( logfil, "?%d?|%.*s|\n", retval, len, src_buf.data + pos0 );
+							lareu2->letexte = src_buf.data;
+							lareu2->lalen = pos1;
+							lareu2->start = pos0;
+							retval = lareu2->matchav();
+							if	( retval > 0 )
+								{
+								pos0 = lareu2->ovector[0];
+								pos1 = lareu2->ovector[1];
+								len = pos1 - pos0;
+								if	( len > 0 )
+									{
+									fprintf( logfil, "link absolu : \"%.*s\" (pour info)\n", len, src_buf.data + pos0 );
+									}
+								}
+							// else	fprintf( logfil, "?%d?|%.*s|\n", retval, len, src_buf.data + pos0 );
+							}
+						} // if len
+					} // if tag
+			break;
+			case 3 :	// empty element tag : pas dans ce fichier
+			break;
+			default :
+				return status;
+			}
+		}	// if status
+	}	// for
+if	( src_ic > 0 )
+	{
+	while	( src_ic < src_buf.size )
+		dst_buf.push( src_buf.data[src_ic++] );
+	}
+return 0;
+}
 
 // un scan qui cherche les include paths dans un .cproject
 // remplace eventuellement les chemins relatifs sur les Drivers

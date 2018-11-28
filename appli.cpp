@@ -91,5 +91,13 @@ leproj = new projfile();
 retval = leproj->process_file( ".project", new_inc_path, new_proj_name );
 delete leproj;
 
+leproj = new projfile();
+retval = leproj->process_file( "Project.uvprojx", new_inc_path, NULL );
+delete leproj;
+
+leproj = new projfile();
+retval = leproj->process_file( "Project.uvoptx", new_inc_path, NULL );
+delete leproj;
+
 return 0;
 }
