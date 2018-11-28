@@ -39,7 +39,7 @@ void gasp( const char *fmt, ... )  /* fatal error handling */
 
 void usage(void)
 {
-printf("usage :\n  recube input_file\n  recube input_file C:/STM32/CubeL4/\n");
+printf("usage : recube {-uC:} {-fF1} {-pC:/STM32/CubeL4} {-nPipo}");
 exit(1);
 }
 
@@ -47,13 +47,41 @@ exit(1);
 int main( int argc, char ** argv )
 {
 int retval;
-const char * new_inc_path = "C:/STM32/CubeL4/";
+const char * new_inc_path = NULL;
 const char * new_proj_name = NULL;
+const char * libpath = "/STM32/Cube";
+char unit = 'C';
+const char * family = "F1";
+
+char inc_path[256];
+
+inc_path[0] = 0;
+for	( int i = 1; i < argc; ++i )
+	{
+	if	( argv[i][0] != '-' )
+		usage();
+	if	( argv[i][2] <= ' ' )
+		usage();
+	switch	( argv[i][1] )
+		{
+		case 'u' : unit = argv[i][2];
+			snprintf( inc_path, sizeof( inc_path ), "%c:%s%s/", unit, libpath, family );
+			break;
+		case 'f' : family = argv[i] + 2;
+			snprintf( inc_path, sizeof( inc_path ), "%c:%s%s/", unit, libpath, family );
+			break;
+		case 'p' :
+			snprintf( inc_path, sizeof( inc_path ), "%s/", argv[i] + 2 );
+			break;
+		case 'n' : new_proj_name = argv[i] + 2;
+			break;
+		}
+	}
+
+if	( inc_path[0] )
+	new_inc_path = inc_path;
 
 projfile * leproj;
-
-if	( argc >= 2 )
-	new_proj_name = argv[1];
 
 leproj = new projfile();
 retval = leproj->process_file( ".cproject", new_inc_path, NULL );
