@@ -29,32 +29,34 @@ for	( int i = 0; i < len; ++i )
 return 0;
 }
 
-// traitement R/W d'un fichier projet, type selon fnam
-int projfile::process_file( const char * fnam, const char * new_inc_path, const char * new_proj_name )
+// traitement R/W d'un fichier projet, type selon ext
+int projfile::process_file( const char * fbase, const char * ext, const char * new_driver_path, const char * new_proj_name )
 {
 FILE * srcfil, *dstfil;
+char fnam[256];
 int retval = 0;
+snprintf( fnam, sizeof(fnam), "%s%s", fbase, ext );
 srcfil = fopen( fnam, "r" );
 if	( srcfil == NULL )
 	return 1;		// fichier non trouve, retour silencieux
 
 printf("\n===== fichier %s ====\n", fnam );
 
-if	( string(fnam) == string(".cproject") )
+if	( ext[1] == 'c' )	// ".cproject"
 	{
-	retval = scan_ac6_cproject( srcfil, stdout, new_inc_path );
+	retval = scan_ac6_cproject( srcfil, stdout, new_driver_path );
 	}
-else if	( string(fnam) == string(".project") )
+else if	( ext[1] == 'p' )	// ".project"
 	{
-	retval = scan_ac6_project( srcfil, stdout, new_inc_path, new_proj_name );
+	retval = scan_ac6_project( srcfil, stdout, new_driver_path, new_proj_name );
 	}
-else if	( string(fnam) == string("Project.uvprojx") )
+else if	( ext[3] == 'p' )	// ".uvprojx"
 	{
-	retval = scan_keil_uvprojx( srcfil, stdout, new_inc_path );
+	retval = scan_keil_uvprojx( srcfil, stdout, new_driver_path );
 	}
-else if	( string(fnam) == string("Project.uvoptx") )
+else if	( ext[3] == 'o' )	// ".uvoptx"
 	{
-	retval = scan_keil_uvoptx( srcfil, stdout, new_inc_path );
+	retval = scan_keil_uvoptx( srcfil, stdout, new_driver_path );
 	}
 
 if	( retval )
@@ -70,8 +72,8 @@ if	( ( hits == 0 ) && ( hits2 == 0 ) )
 if	( dst_buf.size == 0 )
 	return 3;		// aucune substitution, retour silencieux
 
-if	( ( new_inc_path ) && ( hits ) )
-	printf("a remplacer par %s\n", new_inc_path );
+if	( ( new_driver_path ) && ( hits ) )
+	printf("a remplacer par %s\n", new_driver_path );
 if	( ( new_proj_name ) && ( hits2 ) )
 	printf("nouveau nom de projet %s\n", new_proj_name );
 

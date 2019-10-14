@@ -1,4 +1,4 @@
-/* parseur XML version E
+/* parseur XML version EB
    - maintient une pile de l'ascendance de l'element courant
    - teste l'existence des noms d'attributs dans un objet DTD s'il existe
      ( mais ne lit pas la DTD du XML, l'objet DTD doit etre cree par l'application )
@@ -10,6 +10,8 @@
    - compte les lignes et les caracteres
    - step differentie plus clairement empty-element-tag et start-tag
    - old bug fix : manquait un else au case 2 :
+   - si le texte inner est fractionne entre les sous elements, les segments sont concatenes (new in EB)
+   - compiler avec -Wno-misleading-indentation
  */
 #include <iostream>
 #include <fstream>
@@ -181,7 +183,7 @@ switch	( e )
 			{
 			nam += char(c);
 			}
-		else	return(-400);		break;		  
+		else	return(-400);		break;
 	case 5:	if	( c == '"' )
 			{
 			e = 6;
@@ -196,7 +198,7 @@ switch	( e )
 			}
 		else	{
 			val += char(c);
-			}			break;		  
+			}			break;
 	case 7:	if	( c == '>' )
 			{
 			e = -1;				// fin d'empty element tag
@@ -218,7 +220,7 @@ switch	( e )
 			{
 			nam += char(c);
 			}
-		else	e = 11;			break;		  
+		else	e = 11;			break;
 	case 11: if	( c == '>' )
 			{
 			e = -1;				// fin de end-tag
@@ -229,7 +231,7 @@ switch	( e )
 			return(2);
 			}
 		else if	( c > ' ' )
-			return(-1100);		break;	  	
+			return(-1100);		break;
 	case 20: if	( c == '?' )
 			e = 21;			break;
 	case 21: if	( c == '>' )
@@ -241,7 +243,7 @@ switch	( e )
 			e = 50;
 		else	e = 31;			break;
 	case 31: if	( c == '>' )
-			e = 0; 
+			e = 0;
 	case 40: if	( c == '-' )
 			e = 41;
 		else	return(-4000);		break;
@@ -286,12 +288,12 @@ switch	( e )
 			e = 1;
 			lt_pos = curchar;
 			if	( inner_flag )
-				stac.back().inner = val;
+				stac.back().inner += val;
 			}
 		else	{
 			val += char(c);
 			if	( c > ' ' )
-				inner_flag |= 1; 
+				inner_flag |= 1;
 			}			break;
 	default: return(-666);
 	}
@@ -307,6 +309,7 @@ int retval;
 
 while	( ( c = is.get() ) != EOF )
 	{
+	if ( c == 0x7F ) return(9);	// fin de recette dans les logs Frevo 8
 	retval = proc1char( c );
 	if	( retval )
 		return retval;

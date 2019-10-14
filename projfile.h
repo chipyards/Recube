@@ -41,6 +41,6 @@ int scan_keil_uvprojx( FILE * sfil, FILE * logfil, const char * patch );
 int scan_keil_uvoptx( FILE * sfil, FILE * logfil, const char * patch );
 
 // traitement R/W d'un fichier projet, type selon fnam
-int process_file( const char * fnam, const char * new_inc_path, const char * new_proj_name );
+int process_file( const char * fbase, const char * ext, const char * new_driver_path, const char * new_proj_name );
 
 };

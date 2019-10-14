@@ -27,7 +27,7 @@ delo :
 	del *.o
 
 .cpp.o:
-	g++ -Wall $(INCS) -c -O3 $<
+	g++ -Wall $(INCS) -c -O3 -Wno-misleading-indentation $<
 
 .c.o:
 	gcc -Wall $(INCS) -c -O3 $<
